@@ -2,8 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="test.microsoft.com.mytestapp" >
 
-    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="20" />
-
     <uses-feature android:name="android.hardware.wifi.direct" />
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
