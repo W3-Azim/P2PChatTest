@@ -48,7 +48,7 @@
         </LinearLayout>
 
 
-        <ScrollView
+        <!--<ScrollView
             android:id="@+id/SCROLLER_ID"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
@@ -58,10 +58,18 @@
             <TextView
                 android:id="@+id/debugdataBox"
                 android:layout_width="fill_parent"
+                android:gravity="bottom"
                 android:layout_height="fill_parent"
                 android:layout_weight="1.0"/>
 
-        </ScrollView>
+        </ScrollView>-->
+
+        <TextView
+            android:id="@+id/debugdataBox"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:maxLines="60000"
+            android:scrollbars="vertical"/>
 
     </LinearLayout>
 </RelativeLayout>

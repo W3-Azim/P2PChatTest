@@ -1,10 +1,12 @@
 package test.microsoft.com.mytestapp;
 
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
@@ -16,27 +18,28 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.ActionBarActivity;
-import android.os.Bundle;
 import android.text.format.Time;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import static android.net.wifi.p2p.WifiP2pManager.EXTRA_WIFI_P2P_DEVICE;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION;
@@ -117,7 +120,7 @@ public class MainActivity extends ActionBarActivity
     private int mInterval = 1000; // 1 second by default, can be changed later
     private int mPeerDiscoveryWatchdog = 0;
     // for read world usage, we could adjust the time, this is just for testing period
-    private int mPeerDiscoveryWatchdogLimit = (60 * 2); // 2 times 60 seconds
+    private final int mPeerDiscoveryWatchdogLimit = (60 * 2); // 2 times 60 seconds
 
     private Handler mHandler;
     private int timeCounter = 0;
@@ -146,6 +149,7 @@ public class MainActivity extends ActionBarActivity
 
     ChatManager chat = null;
     long msgByteCount = 0;
+    @SuppressLint("HandlerLeak")
     Handler myHandler  = new Handler() {
     @Override
     public void handleMessage(Message msg) {
@@ -177,7 +181,7 @@ public class MainActivity extends ActionBarActivity
                         }, 2000);
                     }
                     String[] separated = readMessage.split(":");
-                    addText("Buddy: (" + conCount + "): " + separated[0] + "using version: " + separated[1]);
+                    addText("Buddy: (" + conCount + "): " + separated[0] + "using SDK version: " + separated[1]);
                     otherPartyVersion = separated[1];
                     mySpeech.speak(readMessage + " having version " + otherPartyVersion);
                     conCount = conCount + 1;
@@ -229,6 +233,7 @@ public class MainActivity extends ActionBarActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        ((TextView) findViewById(R.id.debugdataBox)).setMovementMethod(new ScrollingMovementMethod());
 
         mySpeech = new MyTextSpeech(this);
 
@@ -247,7 +252,15 @@ public class MainActivity extends ActionBarActivity
             dbgFile = new File(path, sFileName);
             dbgFileOs = new FileOutputStream(dbgFile);
 
-            String dattaa = "Os ,Os other ,Type ,FoundService ,StartServiceDiscovery ,GotService ,Connecting ,Connected ,GotConnectionInfo ,GotData ,GotBigData ,FromDcToSd ,FromDataToDisconnect\n";
+            String dattaa = "Os ,Os other ,Type ,FoundService(req peers to add srvc req) ," +
+                    "StartServiceDiscovery(add srvc req to success) ,GotService(start disc and found) ," +
+                    "Connecting(found srvc to p2p.connect's onsuccess) ," +
+                    "Connected(conn req to connectedSystem p2p Broadcast) ," +
+                    "GotConnectionInfo(p2p.requestConnectionInfo to onConnectionInfo) ," +
+                    "GotData(having conninfo to having first data) ," +
+//                    "GotBigData(rx/send 1Mb data to socket) ,FromDcToSd(last data retrieval to disconnect) ,FromDataToDisconnect\n";
+                    "GotBigData(rx/send 1Mb data to socket) ,FromDcToSd(disconnect to start srvc disc) ," +
+                    "FromDataToDisconnect(last big data to disconnect)\n";
             dbgFileOs.write(dattaa.getBytes());
             dbgFileOs.flush();
 
@@ -397,6 +410,7 @@ public class MainActivity extends ActionBarActivity
     }
     @Override
     public void onDestroy() {
+        super.onDestroy();
 
         mHandler.removeCallbacks(mStatusChecker);
 
@@ -406,7 +420,7 @@ public class MainActivity extends ActionBarActivity
         try {
             if (dbgFile != null) {
                 dbgFileOs.close();
-                dbgFile.delete();
+                sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED, Uri.parse(dbgFile.getAbsolutePath())));
             }
         }catch (Exception e){
             addText("dbgFile close error :"  + e.toString() );
@@ -433,7 +447,8 @@ public class MainActivity extends ActionBarActivity
 
     private void stopPeerDiscovery() {
         p2p.stopPeerDiscovery(channel, new WifiP2pManager.ActionListener() {
-            public void onSuccess() {addText("Stopped peer discovery");}
+            public void onSuccess() {
+                addText("Stopped peer discovery");}
             public void onFailure(int reason) {addText("Stopping peer discovery failed, error code " + reason);}
         });
     }
@@ -574,7 +589,7 @@ public class MainActivity extends ActionBarActivity
 
         tGotConnectionInfo = System.currentTimeMillis();
 
-   /*     //when testing without data gottaget the time here as well as counting..
+        //when testing without data gottaget the time here as well as counting..
         tGotData = System.currentTimeMillis();
         conCount = conCount + 1;
         ((TextView) findViewById(R.id.CountBox)).setText("Msg: " + conCount);
@@ -591,21 +606,21 @@ public class MainActivity extends ActionBarActivity
             public void run() {
                 disconnect();
             }
-        }, 5000);*/
+        }, 5000);
 
 
         try {
             if (p2pInfo.isGroupOwner) {
-                addText("Connected as group owner, already listening!");
-                myServiceState = ServiceState.ConnectedAsOwner;
+                addText("[onConnectionInfoAvailable]Connected as group owner, already listening!");
+                myServiceState = ServiceState.ConnectedAsOwner;//Pending state-Azim
                 mLastConnectionRole = LastConnectionRole.GroupOwner;
                 clientSocket = null;
             //  groupSocket = new GroupOwnerSocketHandler(myHandler,Integer.parseInt(SERVICE_PORT_INSTANCE),this);
             //    groupSocket.start();
             } else {
-                addText("will now do socket connection with port : " + CLIENT_PORT_INSTANCE);
+                addText("[onConnectionInfoAvailable]will now do socket connection with port : " + CLIENT_PORT_INSTANCE);
                 mLastConnectionRole = LastConnectionRole.Client;
-                myServiceState = ServiceState.ConnectedAsClient;
+                myServiceState = ServiceState.ConnectedAsClient;//Pending state-Azim
                 clientSocket = new ClientSocketHandler(myHandler,p2pInfo.groupOwnerAddress,Integer.parseInt(CLIENT_PORT_INSTANCE),this);
                 clientSocket.start();
             }
@@ -698,7 +713,16 @@ public class MainActivity extends ActionBarActivity
         timeCounter = 0;
         ((TextView) findViewById(R.id.TimeBox)).setText("T: " + timeCounter);
         Log.d("MyTeststst", text);
-        ((TextView) findViewById(R.id.debugdataBox)).append(text + "\n");
+        TextView textView = ((TextView) findViewById(R.id.debugdataBox));
+        textView.append("["+getReadableTime()+"]"+text + "\n");
+    }
+
+    private String getReadableTime() {
+        long yourmilliseconds = System.currentTimeMillis();
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ssss");
+
+        Date resultdate = new Date(yourmilliseconds);
+        return sdf.format(resultdate);
     }
 
     private class PeerReceiver extends BroadcastReceiver {
